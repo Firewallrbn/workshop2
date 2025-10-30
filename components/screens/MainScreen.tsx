@@ -186,19 +186,6 @@ export default function MainScreen() {
             Preguntas de cultura general generadas por IA
           </Text>
         </View>
-        <TouchableOpacity
-          accessibilityRole="button"
-          disabled={isLoading}
-          onPress={getIAResponse}
-          style={[
-            styles.refreshButton,
-            isLoading ? styles.refreshButtonDisabled : null,
-          ]}
-        >
-          <Text style={styles.refreshButtonText}>
-            {isLoading ? "Cargando..." : "Actualizar"}
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -333,6 +320,22 @@ export default function MainScreen() {
         </View>
       ) : null}
 
+      <View style={styles.refreshContainer}>
+        <TouchableOpacity
+          accessibilityRole="button"
+          disabled={isLoading}
+          onPress={getIAResponse}
+          style={[
+            styles.refreshButton,
+            isLoading ? styles.refreshButtonDisabled : null,
+          ]}
+        >
+          <Text style={styles.refreshButtonText}>
+            {isLoading ? "Cargando..." : "Actualizar"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {isLoading && questions.length > 0 ? (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator color={COLORS.accent} size="large" />
@@ -380,9 +383,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 8,
+    marginTop: 20,
   },
   refreshButtonDisabled: {
     opacity: 0.7,
+  },
+  refreshContainer: {
+    marginTop: 16,
+    alignItems: "flex-end",
   },
   refreshButtonText: {
     color: COLORS.textPrimary,
@@ -524,12 +532,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: "center",
+    justifyContent: "center",
   },
   primaryButtonText: {
     color: COLORS.textPrimary,
     fontWeight: "700",
     fontSize: 14,
     textTransform: "uppercase",
+    textAlign: "center",
   },
   secondaryButton: {
     flex: 1,
