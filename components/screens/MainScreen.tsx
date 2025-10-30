@@ -2,7 +2,6 @@ import { GeminiResponse, QuestionCardData } from "@/types/responses";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -14,6 +13,9 @@ export default function MainScreen() {
   const [questions, setQuestions] = useState<QuestionCardData[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [selectedOptions, setSelectedOptions] = useState<Record<number, number | null>>({});
+  const [revealedQuestions, setRevealedQuestions] = useState<Record<number, boolean>>({});
 
   const generationBody = useMemo(
     () => ({
@@ -123,6 +125,9 @@ export default function MainScreen() {
 
       const parsedQuestions = parseQuestions(JSON.parse(rawText));
       setQuestions(parsedQuestions);
+      setCurrentIndex(0);
+      setSelectedOptions({});
+      setRevealedQuestions({});
     } catch (err) {
       console.error("Error fetching Gemini data", err);
       setQuestions([]);
@@ -135,6 +140,42 @@ export default function MainScreen() {
   useEffect(() => {
     getIAResponse();
   }, [getIAResponse]);
+
+  const currentQuestion = questions[currentIndex];
+  const currentSelection = selectedOptions[currentIndex] ?? null;
+  const isRevealed = revealedQuestions[currentIndex] ?? false;
+
+  const handleOptionPress = (optionIndex: number) => {
+    setSelectedOptions((prev) => ({
+      ...prev,
+      [currentIndex]: optionIndex,
+    }));
+    setRevealedQuestions((prev) => ({
+      ...prev,
+      [currentIndex]: false,
+    }));
+  };
+
+  const handleShowAnswer = () => {
+    if (currentSelection === null) {
+      return;
+    }
+
+    setRevealedQuestions((prev) => ({
+      ...prev,
+      [currentIndex]: true,
+    }));
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) =>
+      Math.min(prev + 1, Math.max(questions.length - 1, 0)),
+    );
+  };
+
+  const handlePrevious = () => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  };
 
   return (
     <View style={styles.container}>
@@ -165,56 +206,139 @@ export default function MainScreen() {
       {isLoading && questions.length === 0 ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator color={COLORS.accent} size="large" />
+          <Text style={styles.loaderText}>Cargando preguntas...</Text>
         </View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.cardsContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {questions.map((question, index) => (
-            <View key={`${question.question}-${index}`} style={styles.card}>
-              <Text style={styles.cardTitle}>{`Pregunta ${index + 1}`}</Text>
-              <Text style={styles.questionText}>{question.question}</Text>
-              <View style={styles.divider} />
-              {question.options.map((option, optionIndex) => {
-                const isCorrect = optionIndex === question.correctOption;
+      ) : null}
 
-                return (
+      {!isLoading && !error && questions.length === 0 ? (
+        <Text style={styles.emptyState}>
+          No hay preguntas disponibles en este momento.
+        </Text>
+      ) : null}
+
+      {currentQuestion ? (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>{`Pregunta ${currentIndex + 1} de ${questions.length}`}</Text>
+          <Text style={styles.questionText}>{currentQuestion.question}</Text>
+          <View style={styles.divider} />
+          <View style={styles.optionsWrapper}>
+            {currentQuestion.options.map((option, optionIndex) => {
+              const isSelected = currentSelection === optionIndex;
+              const isCorrect = optionIndex === currentQuestion.correctOption;
+              const showAsCorrect = isRevealed && isCorrect;
+              const showAsIncorrect = isRevealed && isSelected && !isCorrect;
+
+              return (
+                <TouchableOpacity
+                  key={`${currentQuestion.question}-${optionIndex}`}
+                  activeOpacity={0.8}
+                  onPress={() => handleOptionPress(optionIndex)}
+                  style={[
+                    styles.optionRow,
+                    isSelected ? styles.selectedOptionRow : null,
+                    showAsCorrect ? styles.correctOptionRow : null,
+                    showAsIncorrect ? styles.incorrectOptionRow : null,
+                  ]}
+                >
                   <View
-                    key={`${question.question}-${optionIndex}`}
                     style={[
-                      styles.optionRow,
-                      isCorrect ? styles.correctOptionRow : null,
+                      styles.optionBullet,
+                      isSelected ? styles.selectedOptionBullet : null,
+                      showAsCorrect ? styles.correctOptionBullet : null,
+                      showAsIncorrect ? styles.incorrectOptionBullet : null,
                     ]}
                   >
                     <Text
                       style={[
-                        styles.optionBullet,
-                        isCorrect ? styles.correctOptionBullet : null,
+                        styles.optionBulletText,
+                        showAsCorrect || isSelected
+                          ? styles.optionBulletTextActive
+                          : null,
                       ]}
                     >
                       {String.fromCharCode(65 + optionIndex)}
                     </Text>
-                    <Text
-                      style={[
-                        styles.optionText,
-                        isCorrect ? styles.correctOptionText : null,
-                      ]}
-                    >
-                      {option}
-                    </Text>
                   </View>
-                );
-              })}
-            </View>
-          ))}
-          {!isLoading && !error && questions.length === 0 ? (
-            <Text style={styles.emptyState}>
-              No hay preguntas disponibles en este momento.
+                  <Text
+                    style={[
+                      styles.optionText,
+                      isSelected ? styles.selectedOptionText : null,
+                      showAsCorrect ? styles.correctOptionText : null,
+                      showAsIncorrect ? styles.incorrectOptionText : null,
+                    ]}
+                  >
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {isRevealed ? (
+            <Text
+              style={[
+                styles.feedbackText,
+                currentSelection === currentQuestion.correctOption
+                  ? styles.feedbackTextCorrect
+                  : styles.feedbackTextIncorrect,
+              ]}
+            >
+              {currentSelection === currentQuestion.correctOption
+                ? "¡Respuesta correcta!"
+                : `La respuesta correcta es ${String.fromCharCode(
+                    65 + currentQuestion.correctOption,
+                  )}.`}
             </Text>
           ) : null}
-        </ScrollView>
-      )}
+
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={handlePrevious}
+              disabled={currentIndex === 0}
+              style={[
+                styles.secondaryButton,
+                currentIndex === 0 ? styles.disabledButton : null,
+              ]}
+            >
+              <Text style={styles.secondaryButtonText}>Anterior</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={handleShowAnswer}
+              disabled={currentSelection === null}
+              style={[
+                styles.primaryButton,
+                currentSelection === null ? styles.disabledButton : null,
+              ]}
+            >
+              <Text style={styles.primaryButtonText}>Ver respuesta</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={handleNext}
+              disabled={currentIndex >= questions.length - 1}
+              style={[
+                styles.secondaryButton,
+                currentIndex >= questions.length - 1
+                  ? styles.disabledButton
+                  : null,
+              ]}
+            >
+              <Text style={styles.secondaryButtonText}>Siguiente</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+
+      {isLoading && questions.length > 0 ? (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator color={COLORS.accent} size="large" />
+          <Text style={styles.loaderText}>Actualizando preguntas...</Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -275,10 +399,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 14,
   },
-  cardsContainer: {
-    paddingBottom: 40,
-    gap: 16,
-  },
   card: {
     backgroundColor: COLORS.card,
     borderRadius: 16,
@@ -309,30 +429,36 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 45, 68, 0.4)",
     marginVertical: 16,
   },
+  optionsWrapper: {
+    gap: 12,
+  },
   optionRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
     paddingHorizontal: 12,
-  },
-  correctOptionRow: {
-    backgroundColor: "rgba(255, 45, 68, 0.2)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 45, 68, 0.3)",
+    backgroundColor: "rgba(7, 7, 7, 0.7)",
+    gap: 12,
   },
   optionBullet: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: COLORS.accent,
-    color: COLORS.accent,
-    textAlign: "center",
-    textAlignVertical: "center",
-    fontWeight: "600",
-    marginRight: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(18, 18, 18, 0.8)",
   },
-  correctOptionBullet: {
-    backgroundColor: COLORS.accent,
+  optionBulletText: {
+    color: COLORS.accent,
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  optionBulletTextActive: {
     color: COLORS.textPrimary,
   },
   optionText: {
@@ -340,14 +466,104 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 15,
   },
-  correctOptionText: {
+  selectedOptionRow: {
+    borderColor: COLORS.accent,
+    backgroundColor: "rgba(255, 45, 68, 0.12)",
+  },
+  selectedOptionBullet: {
+    backgroundColor: COLORS.accent,
+  },
+  selectedOptionText: {
     color: COLORS.textPrimary,
     fontWeight: "600",
+  },
+  correctOptionRow: {
+    borderColor: COLORS.accent,
+    backgroundColor: "rgba(255, 45, 68, 0.25)",
+  },
+  correctOptionBullet: {
+    backgroundColor: COLORS.accent,
+  },
+  correctOptionText: {
+    color: COLORS.textPrimary,
+    fontWeight: "700",
+  },
+  incorrectOptionRow: {
+    borderColor: "rgba(255, 45, 68, 0.6)",
+    backgroundColor: "rgba(255, 45, 68, 0.1)",
+  },
+  incorrectOptionBullet: {
+    backgroundColor: "rgba(255, 45, 68, 0.6)",
+  },
+  incorrectOptionText: {
+    color: COLORS.accent,
+    fontWeight: "600",
+  },
+  feedbackText: {
+    marginTop: 20,
+    fontSize: 14,
+    textAlign: "center",
+    fontWeight: "600",
+  },
+  feedbackTextCorrect: {
+    color: COLORS.textPrimary,
+  },
+  feedbackTextIncorrect: {
+    color: COLORS.accent,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 24,
+    gap: 12,
+  },
+  primaryButton: {
+    flex: 1,
+    backgroundColor: COLORS.accent,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  primaryButtonText: {
+    color: COLORS.textPrimary,
+    fontWeight: "700",
+    fontSize: 14,
+    textTransform: "uppercase",
+  },
+  secondaryButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.accent,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  secondaryButtonText: {
+    color: COLORS.textPrimary,
+    fontWeight: "700",
+    fontSize: 14,
+    textTransform: "uppercase",
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   emptyState: {
     color: COLORS.textSecondary,
     fontSize: 14,
     textAlign: "center",
     marginTop: 32,
+  },
+  loaderText: {
+    color: COLORS.textSecondary,
+    marginTop: 12,
+    fontSize: 14,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(7, 7, 7, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 12,
   },
 });
