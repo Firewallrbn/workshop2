@@ -1,4 +1,5 @@
-import MainScreen from "../components/screens/MainScreen";
+import { Redirect } from "expo-router";
+
 export default function Index() {
-  return <MainScreen />;
+  return <Redirect href="/routines" />;
 }
