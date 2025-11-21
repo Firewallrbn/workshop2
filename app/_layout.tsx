@@ -1,8 +1,10 @@
 import { Stack } from "expo-router";
+import { CreateRoutineFlowProvider } from "@/hooks/useCreateRoutineFlow";
 
 export default function RootLayout() {
-  return <Stack 
-  screenOptions={{
-    headerShown: false
-  }} />;
+  return (
+    <CreateRoutineFlowProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </CreateRoutineFlowProvider>
+  );
 }
